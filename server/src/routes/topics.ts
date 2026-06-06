@@ -9,7 +9,7 @@ router.use(authenticate);
 
 router.get('/', async (req: AuthRequest, res) => {
   const topics = await prisma.topic.findMany({
-    where: { userId: req.userId },
+    where: { fkUserId: req.userId },
   });
   res.json(topics);
 });
@@ -20,7 +20,7 @@ router.post('/', async (req: AuthRequest, res) => {
     data: {
       name,
       keywords,
-      userId: req.userId!,
+      fkUserId: req.userId!,
     },
   });
   res.status(201).json(topic);
@@ -30,7 +30,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
   const { id } = req.params;
   const { name, keywords } = req.body;
   const topic = await prisma.topic.updateMany({
-    where: { id: parseInt(id as string), userId: req.userId },
+    where: { id: parseInt(id as string), fkUserId: req.userId },
     data: { name, keywords },
   });
   res.json(topic);
@@ -39,7 +39,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
 router.delete('/:id', async (req: AuthRequest, res) => {
   const { id } = req.params;
   await prisma.topic.deleteMany({
-    where: { id: parseInt(id as string), userId: req.userId },
+    where: { id: parseInt(id as string), fkUserId: req.userId },
   });
   res.status(204).send();
 });

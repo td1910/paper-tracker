@@ -5,7 +5,7 @@ The database is managed using Prisma. Below are the core models.
 ## Models
 
 ### User
-- `id`: Integer (Primary Key, Autoincrement)
+- `id`: String (Primary Key, UUID)
 - `email`: String (Unique)
 - `passwordHash`: String
 - `createdAt`: DateTime
@@ -14,7 +14,7 @@ The database is managed using Prisma. Below are the core models.
 - `id`: Integer (Primary Key, Autoincrement)
 - `name`: String
 - `keywords`: String (Comma-separated keywords used for arXiv searching)
-- `userId`: Integer (Foreign Key to User)
+- `fkUserId`: String (Foreign Key to User)
 - `createdAt`: DateTime
 
 ### Paper
@@ -30,10 +30,10 @@ The database is managed using Prisma. Below are the core models.
 - `createdAt`: DateTime
 
 ### PaperTopic (Many-to-Many)
-- `paperId`: Integer (Foreign Key to Paper)
-- `topicId`: Integer (Foreign Key to Topic)
+- `fkPaperId`: Integer (Foreign Key to Paper)
+- `fkTopicId`: Integer (Foreign Key to Topic)
 
 ### Favorite
-- `userId`: Integer (Foreign Key to User)
-- `paperId`: Integer (Foreign Key to Paper)
+- `fkUserId`: String (Foreign Key to User)
+- `fkPaperId`: Integer (Foreign Key to Paper)
 - `createdAt`: DateTime

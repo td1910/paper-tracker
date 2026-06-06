@@ -10,7 +10,7 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
+  id            String   @id @default(uuid())
   email         String   @unique
   passwordHash  String
   createdAt     DateTime @default(now())
@@ -19,45 +19,45 @@ model User {
 }
 
 model Topic {
-  id        Int      @id @default(autoincrement())
-  name      String
-  keywords  String   // Comma separated keywords
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  papers    PaperTopic[]
-  createdAt DateTime @default(now())
+  id         Int          @id @default(autoincrement())
+  name       String
+  keywords   String       // Comma separated keywords
+  fkUserId   String
+  user       User         @relation(fields: [fkUserId], references: [id])
+  papers     PaperTopic[]
+  createdAt  DateTime     @default(now())
 }
 
 model Paper {
-  id            Int      @id @default(autoincrement())
-  arxivId       String   @unique
+  id            Int          @id @default(autoincrement())
+  arxivId       String       @unique
   title         String
   abstract      String
   summary       String?
-  authors       String   // JSON string or comma separated
+  authors       String       // JSON string or comma separated
   publishedDate DateTime
   url           String
   score         Float?
   topics        PaperTopic[]
   favorites     Favorite[]
-  createdAt     DateTime @default(now())
+  createdAt  DateTime     @default(now())
 }
 
 model PaperTopic {
-  paperId Int
-  topicId Int
-  paper   Paper @relation(fields: [paperId], references: [id])
-  topic   Topic @relation(fields: [topicId], references: [id])
+  fkPaperId Int
+  fkTopicId Int
+  paper      Paper @relation(fields: [fkPaperId], references: [id])
+  topic      Topic @relation(fields: [fkTopicId], references: [id])
 
-  @@id([paperId, topicId])
+  @@id([fkPaperId, fkTopicId])
 }
 
 model Favorite {
-  userId    Int
-  paperId   Int
-  user      User   @relation(fields: [userId], references: [id])
-  paper     Paper  @relation(fields: [paperId], references: [id])
-  createdAt DateTime @default(now())
+  fkUserId   String
+  fkPaperId  Int
+  user       User   @relation(fields: [fkUserId], references: [id])
+  paper      Paper  @relation(fields: [fkPaperId], references: [id])
+  createdAt  DateTime @default(now())
 
-  @@id([userId, paperId])
+  @@id([fkUserId, fkPaperId])
 }

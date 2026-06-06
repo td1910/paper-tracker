@@ -14,7 +14,7 @@ router.get('/', async (req: AuthRequest, res) => {
       topics: {
         some: {
           topic: {
-            userId: req.userId
+            fkUserId: req.userId
           }
         }
       }
@@ -54,7 +54,7 @@ router.get('/:id', async (req: AuthRequest, res) => {
     where: { id: parseInt(id as string) },
     include: {
       favorites: {
-        where: { userId: req.userId }
+        where: { fkUserId: req.userId }
       }
     }
   });
@@ -67,8 +67,8 @@ router.post('/:id/favorite', async (req: AuthRequest, res) => {
   try {
     await prisma.favorite.create({
       data: {
-        userId: req.userId!,
-        paperId: parseInt(id as string)
+        fkUserId: req.userId!,
+        fkPaperId: parseInt(id as string)
       }
     });
     res.status(201).json({ message: 'Paper favorited' });
@@ -82,8 +82,8 @@ router.delete('/:id/favorite', async (req: AuthRequest, res) => {
   const { id } = req.params;
   await prisma.favorite.deleteMany({
     where: {
-      userId: req.userId,
-      paperId: parseInt(id as string)
+      fkUserId: req.userId,
+      fkPaperId: parseInt(id as string)
     }
   });
   res.status(204).send();
