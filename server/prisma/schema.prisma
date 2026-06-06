@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  topics        Topic[]
+  favorites     Favorite[]
+}
+
+model Topic {
+  id        Int      @id @default(autoincrement())
+  name      String
+  keywords  String   // Comma separated keywords
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  papers    PaperTopic[]
+  createdAt DateTime @default(now())
+}
+
+model Paper {
+  id            Int      @id @default(autoincrement())
+  arxivId       String   @unique
+  title         String
+  abstract      String
+  summary       String?
+  authors       String   // JSON string or comma separated
+  publishedDate DateTime
+  url           String
+  score         Float?
+  topics        PaperTopic[]
+  favorites     Favorite[]
+  createdAt     DateTime @default(now())
+}
+
+model PaperTopic {
+  paperId Int
+  topicId Int
+  paper   Paper @relation(fields: [paperId], references: [id])
+  topic   Topic @relation(fields: [topicId], references: [id])
+
+  @@id([paperId, topicId])
+}
+
+model Favorite {
+  userId    Int
+  paperId   Int
+  user      User   @relation(fields: [userId], references: [id])
+  paper     Paper  @relation(fields: [paperId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([userId, paperId])
+}
