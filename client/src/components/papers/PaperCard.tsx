@@ -18,6 +18,7 @@ interface Paper {
   authors: string;
   publishedDate: string;
   url: string;
+  summary?: string;
   topics?: PaperTopic[];
 }
 
@@ -58,8 +59,15 @@ export function PaperCard({ paper }: { paper: Paper }) {
         </div>
       )}
 
+      {paper.summary && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-3 rounded-md mb-4 text-sm text-blue-900 shadow-sm">
+          {paper.summary}
+        </div>
+      )}
+
       <div className="text-gray-700 text-sm mt-auto">
         <p className={`${!isExpanded && 'line-clamp-3'}`}>
+          <span className="font-semibold block mb-1">Abstract:</span>
           {paper.abstract}
         </p>
         

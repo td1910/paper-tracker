@@ -45,10 +45,14 @@ export class ArxivService {
             authorList = [entry.author.name];
           }
 
+          // TODO: Replace this dummy logic with actual Gemini API call later
+          const dummySummary = `✨ [AI Summary] This paper introduces novel approaches to ${entry.title.split(' ').slice(0, 3).join(' ')}... and explores its implications for the field.`;
+
           const paper = await this.paperRepository.upsertPaper({
             arxivId,
             title: entry.title.replace(/\n/g, ' ').trim(),
             abstract: entry.summary.trim(),
+            summary: dummySummary,
             authors: authorList.join(', '),
             publishedDate: new Date(entry.published),
             url: entry.id,
