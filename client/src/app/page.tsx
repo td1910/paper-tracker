@@ -17,6 +17,12 @@ interface PaperTopic {
   topic: Topic;
 }
 
+interface NotificationItem {
+  id: number;
+  message: string;
+  createdAt: string;
+}
+
 interface Paper {
   id: number;
   arxivId: string;
@@ -41,6 +47,8 @@ export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
 
   const loadPapers = useCallback(async () => {
@@ -82,6 +90,13 @@ export default function Dashboard() {
 
           const favs = await apiRequest('/papers/my-favorites', { headers: { Authorization: `Bearer ${token}` } });
           setFavoritedPaperIds(new Set(favs));
+
+          try {
+            const notifs = await apiRequest('/notifications', { headers: { Authorization: `Bearer ${token}` } });
+            setNotifications(notifs);
+          } catch (e) {
+            console.error('Failed to load notifications', e);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -98,11 +113,33 @@ export default function Dashboard() {
       setIsFetching(true);
       await apiRequest('/papers/fetch-now');
       await loadPapers();
+      
+      const token = localStorage.getItem('token');
+      if (token) {
+        const notifs = await apiRequest('/notifications', { headers: { Authorization: `Bearer ${token}` } });
+        setNotifications(notifs);
+      }
     } catch (error) {
       console.error('Failed to fetch from ArXiv:', error);
       alert('Failed to fetch papers from ArXiv. See console.');
     } finally {
       setIsFetching(false);
+    }
+  };
+
+  const handleMarkNotificationsRead = async () => {
+    if (notifications.length === 0) return;
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await apiRequest('/notifications/mark-read', { 
+          method: 'PUT', 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        setNotifications([]);
+      }
+    } catch (e) {
+      console.error('Failed to mark read', e);
     }
   };
 
@@ -225,7 +262,44 @@ export default function Dashboard() {
 
             {userId ? (
               <div className="flex gap-4 items-center">
-                <span className="text-sm text-gray-700 font-medium">{userEmail}</span>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      const newShow = !showNotifications;
+                      setShowNotifications(newShow);
+                      if (newShow) handleMarkNotificationsRead();
+                    }}
+                    className="relative text-gray-500 hover:text-blue-600 transition focus:outline-none flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 hover:bg-blue-50"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    {notifications.length > 0 && (
+                      <span className="absolute top-0 right-0 flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 ring-2 ring-white"></span>
+                      </span>
+                    )}
+                  </button>
+                  {showNotifications && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white shadow-xl rounded-lg border border-gray-100 py-2 z-50 transform origin-top-right transition-all">
+                      <h3 className="text-sm font-bold border-b border-gray-100 px-4 pb-2 mb-2 text-gray-800">Notifications</h3>
+                      <div className="max-h-64 overflow-y-auto px-2">
+                        {notifications.length === 0 ? (
+                          <p className="text-xs text-gray-500 text-center py-4">No new notifications</p>
+                        ) : (
+                          notifications.map(n => (
+                            <div key={n.id} className="text-sm p-3 hover:bg-blue-50 rounded-md transition cursor-default mb-1">
+                              <p className="text-gray-800 font-medium">{n.message}</p>
+                              <div className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="text-sm text-gray-700 font-medium border-l border-gray-300 pl-4">{userEmail}</span>
                 <button
                   onClick={handleLogout}
                   className="text-gray-500 hover:text-red-600 text-sm font-medium transition"

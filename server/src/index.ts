@@ -5,6 +5,7 @@ import authRoutes from './routes/auth';
 import topicRoutes from './routes/topics';
 import userTopicRoutes from './routes/user-topics';
 import paperRoutes from './routes/papers';
+import notificationRoutes from './routes/notifications';
 import { startCronJobs } from './services/cron.service';
 
 dotenv.config();
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/user-topics', userTopicRoutes);
 app.use('/api/papers', paperRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/', (req, res) => {
   res.send('Hello from Paper Tracker API');

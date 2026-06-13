@@ -16,6 +16,7 @@ model User {
   createdAt    DateTime    @default(now())
   userTopics   UserTopic[]
   favorites    Favorite[]
+  notifications Notification[]
 }
 
 model Topic {
@@ -26,6 +27,15 @@ model Topic {
   papers      PaperTopic[]
   followers   UserTopic[]
   createdAt   DateTime     @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  message   String
+  isRead    Boolean  @default(false)
+  fkUserId  String
+  user      User     @relation(fields: [fkUserId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
 
 model UserTopic {
@@ -52,6 +62,7 @@ model Paper {
   score         Float?
   aiSummary     String?
   readabilityScore Int?
+  aiStatus      String       @default("PENDING")
   topics        PaperTopic[]
   favorites     Favorite[]
   createdAt     DateTime     @default(now())

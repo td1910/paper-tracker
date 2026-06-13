@@ -3,7 +3,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { PaperRepository } from '../repositories/paper.repository';
 import { validateArxivEntry } from '../validators/arxiv.validator';
 import prisma from '../lib/prisma';
-import { GoogleGenAI, Type } from '@google/genai';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -73,67 +72,11 @@ export class ArxivService {
       }
 
       console.log(`[${topic.name}] Saved ${savedCount} papers.`);
+      return savedCount;
     } catch (error) {
       console.error(`Error fetching papers for topic "${topic.name}":`, error);
       throw error;
     }
-  }
-
-  async processUnscoredPapers() {
-    if (!process.env.GEMINI_API_KEY) {
-      console.warn('No GEMINI_API_KEY found, skipping AI scoring.');
-      return;
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    // get papers that have not been scored yet
-    const unscoredPapers = await prisma.paper.findMany({
-      where: { readabilityScore: null },
-      take: 5 // small batch to avoid rate limits
-    });
-
-    if (unscoredPapers.length === 0) return;
-    console.log(`[AI] Scoring ${unscoredPapers.length} papers with Gemini API...`);
-
-    for (const paper of unscoredPapers) {
-      try {
-        const prompt = `Analyze this academic abstract. Provide a readability score from 1 to 10 for a general tech audience (where 10 means extremely interesting and easy to understand). Also provide a concise 2-sentence summary in English.\n\nAbstract: ${paper.abstract}`;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                aiSummary: { type: Type.STRING },
-                readabilityScore: { type: Type.INTEGER }
-              },
-              required: ['aiSummary', 'readabilityScore']
-            }
-          }
-        });
-
-        if (response.text) {
-          const parsed = JSON.parse(response.text);
-          await prisma.paper.update({
-            where: { id: paper.id },
-            data: {
-              aiSummary: "✨ " + parsed.aiSummary,
-              summary: "✨ " + parsed.aiSummary, // update the old fallback field too
-              readabilityScore: parsed.readabilityScore
-            }
-          });
-          console.log(`[AI] Scored Paper ID ${paper.id}: ${parsed.readabilityScore}/10`);
-        }
-      } catch (err) {
-        console.error(`[AI] Failed to score paper ${paper.id}:`, err);
-      }
-      // Be respectful of API limits
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-    console.log(`[AI] Finished scoring batch.`);
   }
 
   // Fetch papers for all topics in the catalog
@@ -141,14 +84,29 @@ export class ArxivService {
     const topics = await prisma.topic.findMany();
     for (const topic of topics) {
       try {
-        await this.fetchAndSaveForTopic(topic, maxResults);
+        const count = await this.fetchAndSaveForTopic(topic, maxResults);
+        
+        // Notify followers if new papers were found
+        if (count && count > 0) {
+          const followers = await prisma.userTopic.findMany({
+            where: { fkTopicId: topic.id }
+          });
+          if (followers.length > 0) {
+            await prisma.notification.createMany({
+              data: followers.map(f => ({
+                fkUserId: f.fkUserId,
+                message: `We found ${count} new papers for ${topic.name}!`
+              }))
+            });
+            console.log(`[Notifications] Sent to ${followers.length} users for topic ${topic.name}`);
+          }
+        }
+
         // Small delay between requests to be respectful of arXiv rate limits
         await new Promise(r => setTimeout(r, 1000));
       } catch (error) {
         console.error(`Failed to fetch topic "${topic.name}", continuing...`);
       }
     }
-    // Eventually consistent scoring: trigger background job without awaiting
-    this.processUnscoredPapers().catch(console.error);
   }
 }
