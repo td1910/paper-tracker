@@ -1,40 +1,21 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { PaperController } from '../controllers/paper.controller';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
+const paperController = new PaperController();
 
-router.use(authenticate);
+// Public routes
+// Manually trigger fetch
+router.get('/fetch-now', paperController.fetchNow);
 
-// List papers for user's topics
-router.get('/', async (req: AuthRequest, res) => {
-  const papers = await prisma.paper.findMany({
-    where: {
-      topics: {
-        some: {
-          topic: {
-            fkUserId: req.userId
-          }
-        }
-      }
-    },
-    include: {
-      topics: {
-        include: {
-          topic: true
-        }
-      }
-    },
-    orderBy: {
-      publishedDate: 'desc'
-    }
-  });
-  res.json(papers);
-});
+// List all fetched papers
+router.get('/', paperController.getAllPapers);
 
 // Search papers
-router.get('/search', async (req: AuthRequest, res) => {
+router.get('/search', async (req: Request, res) => {
   const { q } = req.query;
   const papers = await prisma.paper.findMany({
     where: {
@@ -48,18 +29,19 @@ router.get('/search', async (req: AuthRequest, res) => {
 });
 
 // Get paper details
-router.get('/:id', async (req: AuthRequest, res) => {
+router.get('/:id', async (req: Request, res) => {
   const { id } = req.params;
   const paper = await prisma.paper.findUnique({
     where: { id: parseInt(id as string) },
     include: {
-      favorites: {
-        where: { fkUserId: req.userId }
-      }
+      favorites: true // Simplified for public view, ideally filter by user if logged in
     }
   });
   res.json(paper);
 });
+
+// Protected routes (require authentication)
+router.use(authenticate);
 
 // Save favorite
 router.post('/:id/favorite', async (req: AuthRequest, res) => {

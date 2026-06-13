@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
 
 router.use(authenticate);
 

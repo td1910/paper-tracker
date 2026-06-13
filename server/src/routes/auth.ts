@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
 router.post('/register', async (req, res) => {
