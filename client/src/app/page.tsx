@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [favoritedPaperIds, setFavoritedPaperIds] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const router = useRouter();
@@ -103,6 +105,23 @@ export default function Dashboard() {
     }
   };
 
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSearching(true);
+      if (searchQuery.trim() === '') {
+        await loadPapers();
+      } else {
+        const results = await apiRequest(`/papers/search?q=${encodeURIComponent(searchQuery)}`);
+        setPapers(results);
+      }
+    } catch (err) {
+      console.error('Search failed:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
@@ -166,7 +185,31 @@ export default function Dashboard() {
       <nav className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-blue-900">Paper Tracker</h1>
+            <h1 className="text-xl font-bold text-blue-900 shrink-0">Paper Tracker</h1>
+            
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-md mx-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search papers by keyword..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="absolute left-3 top-2.5 text-gray-400">
+                  {isSearching ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  )}
+                </div>
+                <button type="submit" className="hidden">Search</button>
+              </div>
+            </form>
+
             {userId ? (
               <div className="flex gap-4 items-center">
                 <span className="text-sm text-gray-700 font-medium">{userEmail}</span>

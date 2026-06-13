@@ -22,6 +22,9 @@ router.get('/search', async (req: Request, res) => {
         { title: { contains: String(q) } },
         { abstract: { contains: String(q) } },
       ]
+    },
+    include: {
+      topics: true
     }
   });
   res.json(papers);
