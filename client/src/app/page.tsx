@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiRequest } from '@/lib/api';
 import { PaperCard } from '@/components/papers/PaperCard';
 
@@ -153,14 +154,21 @@ export default function Dashboard() {
           <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-24">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-800 text-sm">Topics</h3>
-              {selectedTopicIds.size > 0 && (
-                <button
-                  onClick={clearFilter}
-                  className="text-xs text-blue-500 hover:text-blue-700"
-                >
-                  Clear
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {userId && (
+                  <Link href="/settings/topics" className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                    Manage
+                  </Link>
+                )}
+                {selectedTopicIds.size > 0 && (
+                  <button
+                    onClick={clearFilter}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* All option */}
