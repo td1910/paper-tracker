@@ -29,6 +29,7 @@ interface Paper {
 
 export default function Dashboard() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
@@ -51,7 +52,11 @@ export default function Dashboard() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const storedUserId = localStorage.getItem('userId');
-    if (token) setUserId(storedUserId);
+    const storedUserEmail = localStorage.getItem('userEmail');
+    if (token) {
+      setUserId(storedUserId);
+      setUserEmail(storedUserEmail);
+    }
 
     // Load papers and topics in parallel
     Promise.all([
@@ -76,7 +81,9 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
     setUserId(null);
+    setUserEmail(null);
   };
 
   const toggleTopic = (topicId: number) => {
@@ -111,19 +118,30 @@ export default function Dashboard() {
           <div className="flex justify-between h-16 items-center">
             <h1 className="text-xl font-bold text-blue-900">Paper Tracker</h1>
             {userId ? (
-              <button
-                onClick={handleLogout}
-                className="text-gray-500 hover:text-red-600 text-sm font-medium transition"
-              >
-                Logout
-              </button>
+              <div className="flex gap-4 items-center">
+                <span className="text-sm text-gray-700 font-medium">{userEmail}</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-500 hover:text-red-600 text-sm font-medium transition"
+                >
+                  Logout
+                </button>
+              </div>
             ) : (
-              <button
-                onClick={() => router.push('/login')}
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium transition"
-              >
-                Login
-              </button>
+              <div className="flex gap-4 items-center">
+                <button
+                  onClick={() => router.push('/login')}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium transition"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => router.push('/register')}
+                  className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-md text-sm font-medium transition shadow-sm"
+                >
+                  Sign Up
+                </button>
+              </div>
             )}
           </div>
         </div>

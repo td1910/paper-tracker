@@ -16,7 +16,7 @@ router.post('/register', async (req, res) => {
         passwordHash: hashedPassword,
       },
     });
-    res.status(201).json({ message: 'User created successfully', userId: user.id });
+    res.status(201).json({ message: 'User created successfully', userId: user.id, email: user.email });
   } catch (error) {
     res.status(400).json({ error: 'Email already exists or invalid data' });
   }
@@ -32,7 +32,7 @@ router.post('/login', async (req, res) => {
     if (!isValid) return res.status(401).json({ error: 'Invalid password' });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '24h' });
-    res.json({ token, userId: user.id });
+    res.json({ token, userId: user.id, email: user.email });
   } catch (error) {
     res.status(500).json({ error: 'Login failed' });
   }
