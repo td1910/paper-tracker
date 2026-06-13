@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [favoritedPaperIds, setFavoritedPaperIds] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
@@ -110,8 +111,10 @@ export default function Dashboard() {
     try {
       setIsSearching(true);
       if (searchQuery.trim() === '') {
+        setSubmittedQuery('');
         await loadPapers();
       } else {
+        setSubmittedQuery(searchQuery.trim());
         const results = await apiRequest(`/papers/search?q=${encodeURIComponent(searchQuery)}`);
         setPapers(results);
       }
@@ -185,7 +188,17 @@ export default function Dashboard() {
       <nav className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-bold text-blue-900 shrink-0">Paper Tracker</h1>
+            <div className="flex items-center gap-6 shrink-0">
+              <h1 className="text-xl font-bold text-blue-900">Paper Tracker</h1>
+              <div className="flex items-center gap-4 border-l pl-6 border-gray-200">
+                <Link href="/" className="text-sm font-medium text-blue-600 transition">
+                  Feed
+                </Link>
+                <Link href="/trends" className="text-sm font-medium text-gray-500 hover:text-blue-600 transition">
+                  Trends 📈
+                </Link>
+              </div>
+            </div>
             
             {/* Search Bar */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md mx-8">
@@ -325,11 +338,13 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {showFavoritesOnly
-                  ? 'My Favorites'
-                  : selectedTopicIds.size === 0
-                    ? 'Latest Papers'
-                    : `${filteredPapers.length} paper${filteredPapers.length !== 1 ? 's' : ''} in ${selectedTopicIds.size} topic${selectedTopicIds.size !== 1 ? 's' : ''}`}
+                {submittedQuery
+                  ? `Found ${filteredPapers.length} result${filteredPapers.length !== 1 ? 's' : ''} for "${submittedQuery}"`
+                  : showFavoritesOnly
+                    ? 'My Favorites'
+                    : selectedTopicIds.size === 0
+                      ? 'Latest Papers'
+                      : `${filteredPapers.length} paper${filteredPapers.length !== 1 ? 's' : ''} in ${selectedTopicIds.size} topic${selectedTopicIds.size !== 1 ? 's' : ''}`}
               </h2>
               {selectedTopicIds.size > 0 && (
                 <p className="text-sm text-gray-500 mt-0.5">

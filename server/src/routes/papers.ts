@@ -24,8 +24,11 @@ router.get('/search', async (req: Request, res) => {
       ]
     },
     include: {
-      topics: true
-    }
+      topics: {
+        include: { topic: true }
+      }
+    },
+    orderBy: { publishedDate: 'desc' }
   });
   res.json(papers);
 });
