@@ -44,7 +44,7 @@ describe('ArXiv Fetcher Service', () => {
     // @ts-ignore
     prisma.paper.upsert.mockResolvedValueOnce({});
 
-    await arxivService.fetchAndSavePapers();
+    await arxivService.fetchAllTopics();
 
     // Verify axios was called with the correct URL
     expect(mockedAxios.get).toHaveBeenCalledWith(expect.stringContaining('http://export.arxiv.org/api/query'));

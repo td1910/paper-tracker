@@ -19,6 +19,7 @@ interface Paper {
   publishedDate: string;
   url: string;
   summary?: string;
+  readabilityScore?: number | null;
   topics?: PaperTopic[];
 }
 
@@ -87,8 +88,21 @@ export function PaperCard({ paper, isFavorited = false, onToggleFavorite }: Pape
       )}
 
       {paper.summary && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-3 rounded-md mb-4 text-sm text-blue-900 shadow-sm">
-          {paper.summary}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-3 rounded-md mb-4 shadow-sm flex flex-col gap-2">
+          {paper.readabilityScore !== undefined && paper.readabilityScore !== null && (
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${
+                paper.readabilityScore >= 8 ? 'bg-green-500' : 
+                paper.readabilityScore >= 5 ? 'bg-yellow-500' : 'bg-red-500'
+              }`}>
+                AI Score: {paper.readabilityScore}/10
+              </span>
+              <span className="text-xs text-blue-800/60 font-bold uppercase tracking-wider">Readability</span>
+            </div>
+          )}
+          <div className="text-sm text-blue-900">
+            {paper.summary}
+          </div>
         </div>
       )}
 

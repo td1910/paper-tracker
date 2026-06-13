@@ -50,6 +50,8 @@ model Paper {
   publishedDate DateTime
   url           String
   score         Float?
+  aiSummary     String?
+  readabilityScore Int?
   topics        PaperTopic[]
   favorites     Favorite[]
   createdAt     DateTime     @default(now())

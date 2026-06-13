@@ -58,12 +58,13 @@ describe('Papers API Feed', () => {
 
   describe('GET /api/papers/fetch-now', () => {
     it('should manually trigger the arXiv fetcher and return success', async () => {
-      const response = await request(app).get('/api/papers/fetch-now');
+      jest.spyOn(ArxivService.prototype, 'fetchAllTopics').mockResolvedValueOnce();
+
+      const response = await request(app).post('/api/papers/fetch-now');
       
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({ message: 'Fetch triggered successfully' });
-      // The controller creates a new instance. With jest.mock, instances get trackable mocks.
-      expect(ArxivService.prototype.fetchAndSavePapers).toHaveBeenCalledTimes(1);
+      expect(response.body).toEqual({ message: 'Fetch triggered successfully for all topics' });
+      expect(ArxivService.prototype.fetchAllTopics).toHaveBeenCalledTimes(1);
     });
   });
 });
