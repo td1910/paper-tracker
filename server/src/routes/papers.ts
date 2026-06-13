@@ -1,10 +1,9 @@
 import { Router, Request } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { PaperController } from '../controllers/paper.controller';
 
 const router = Router();
-const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
 const paperController = new PaperController();
 
 // Public routes

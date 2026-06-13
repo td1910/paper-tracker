@@ -10,22 +10,34 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String
-  createdAt     DateTime @default(now())
-  topics        Topic[]
-  favorites     Favorite[]
+  id           String      @id @default(uuid())
+  email        String      @unique
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  userTopics   UserTopic[]
+  favorites    Favorite[]
 }
 
 model Topic {
-  id         Int          @id @default(autoincrement())
-  name       String
-  keywords   String       // Comma separated keywords
-  fkUserId   String
-  user       User         @relation(fields: [fkUserId], references: [id])
-  papers     PaperTopic[]
-  createdAt  DateTime     @default(now())
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  keywords    String       // General search keywords, source-agnostic
+  description String?
+  papers      PaperTopic[]
+  followers   UserTopic[]
+  createdAt   DateTime     @default(now())
+}
+
+model UserTopic {
+  id          Int      @id @default(autoincrement())
+  fkUserId    String
+  fkTopicId   Int
+  keywords    String?  // Extra personal keywords to narrow the topic
+  user        User     @relation(fields: [fkUserId], references: [id])
+  topic       Topic    @relation(fields: [fkTopicId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([fkUserId, fkTopicId])
 }
 
 model Paper {
@@ -34,30 +46,30 @@ model Paper {
   title         String
   abstract      String
   summary       String?
-  authors       String       // JSON string or comma separated
+  authors       String
   publishedDate DateTime
   url           String
   score         Float?
   topics        PaperTopic[]
   favorites     Favorite[]
-  createdAt  DateTime     @default(now())
+  createdAt     DateTime     @default(now())
 }
 
 model PaperTopic {
   fkPaperId Int
   fkTopicId Int
-  paper      Paper @relation(fields: [fkPaperId], references: [id])
-  topic      Topic @relation(fields: [fkTopicId], references: [id])
+  paper     Paper @relation(fields: [fkPaperId], references: [id])
+  topic     Topic @relation(fields: [fkTopicId], references: [id])
 
   @@id([fkPaperId, fkTopicId])
 }
 
 model Favorite {
-  fkUserId   String
-  fkPaperId  Int
-  user       User   @relation(fields: [fkUserId], references: [id])
-  paper      Paper  @relation(fields: [fkPaperId], references: [id])
-  createdAt  DateTime @default(now())
+  fkUserId  String
+  fkPaperId Int
+  user      User     @relation(fields: [fkUserId], references: [id])
+  paper     Paper    @relation(fields: [fkPaperId], references: [id])
+  createdAt DateTime @default(now())
 
   @@id([fkUserId, fkPaperId])
 }

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { PaperRepository } from '../repositories/paper.repository';
 import { validateArxivEntry } from '../validators/arxiv.validator';
+import prisma from '../lib/prisma';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -15,53 +16,77 @@ export class ArxivService {
     this.paperRepository = new PaperRepository();
   }
 
-  async fetchAndSavePapers(category = 'cs.AI', maxResults = 10) {
+  async fetchAndSaveForTopic(topic: { id: number; name: string; keywords: string }, maxResults = 10) {
     try {
-      const url = `http://export.arxiv.org/api/query?search_query=cat:${category}&sortBy=submittedDate&sortOrder=desc&max_results=${maxResults}`;
-      const response = await axios.get(url);
-      const xmlData = response.data;
+      // Build source-agnostic keyword query for arXiv
+      const terms = topic.keywords
+        .split(',')
+        .map(k => `all:%22${encodeURIComponent(k.trim())}%22`)
+        .join('+OR+');
 
-      const parsedData = parser.parse(xmlData);
-      
-      let entries = parsedData.feed.entry || [];
-      if (!Array.isArray(entries)) {
-        entries = [entries];
-      }
+      const url = `http://export.arxiv.org/api/query?search_query=${terms}&sortBy=submittedDate&sortOrder=descending&max_results=${maxResults}`;
+      const response = await axios.get(url);
+      const parsedData = parser.parse(response.data);
+
+      let entries = parsedData.feed?.entry || [];
+      if (!Array.isArray(entries)) entries = [entries];
 
       let savedCount = 0;
 
       for (const rawEntry of entries) {
         try {
           const entry = validateArxivEntry(rawEntry);
-          
-          const idUrl = entry.id;
-          const arxivId = idUrl.split('/abs/')[1];
+          const arxivId = entry.id.split('/abs/')[1];
 
-          let authorList = [];
+          let authorList: string[] = [];
           if (Array.isArray(entry.author)) {
             authorList = entry.author.map((a: any) => a.name);
-          } else if (entry.author && entry.author.name) {
+          } else if (entry.author?.name) {
             authorList = [entry.author.name];
           }
-          const authorsString = authorList.join(', ');
 
-          await this.paperRepository.upsertPaper({
+          const paper = await this.paperRepository.upsertPaper({
             arxivId,
             title: entry.title.replace(/\n/g, ' ').trim(),
             abstract: entry.summary.trim(),
-            authors: authorsString,
+            authors: authorList.join(', '),
             publishedDate: new Date(entry.published),
-            url: idUrl,
+            url: entry.id,
           });
+
+          // Tag paper with this topic
+          try {
+            await prisma.paperTopic.create({
+              data: { fkPaperId: paper.id, fkTopicId: topic.id },
+            });
+          } catch (e) {
+            // Ignore unique constraint violation if it already exists
+          }
+
           savedCount++;
         } catch (validationError) {
-          console.warn('Skipping invalid arXiv entry:', validationError);
+          console.warn(`Skipping invalid entry for topic "${topic.name}":`, validationError);
         }
       }
-      console.log(`Successfully fetched and saved ${savedCount} papers for ${category}.`);
+
+      console.log(`[${topic.name}] Saved ${savedCount} papers.`);
     } catch (error) {
-      console.error('Error fetching papers from arXiv:', error);
+      console.error(`Error fetching papers for topic "${topic.name}":`, error);
       throw error;
+    }
+  }
+
+  // Fetch papers for all topics in the catalog
+  async fetchAllTopics(maxResults = 10) {
+    const topics = await prisma.topic.findMany();
+    for (const topic of topics) {
+      try {
+        await this.fetchAndSaveForTopic(topic, maxResults);
+        // Small delay between requests to be respectful of arXiv rate limits
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (error) {
+        console.error(`Failed to fetch topic "${topic.name}", continuing...`);
+      }
     }
   }
 }

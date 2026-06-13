@@ -1,21 +1,23 @@
-import { PrismaClient, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
+import { Prisma } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 export class PaperRepository {
   async upsertPaper(data: Prisma.PaperCreateInput) {
     return prisma.paper.upsert({
       where: { arxivId: data.arxivId },
-      update: {}, // Do nothing if it exists
+      update: {},
       create: data,
     });
   }
 
   async getAllPapersSortedByDate() {
     return prisma.paper.findMany({
-      orderBy: {
-        publishedDate: 'desc'
-      }
+      include: {
+        topics: {
+          include: { topic: true },
+        },
+      },
+      orderBy: { publishedDate: 'desc' },
     });
   }
 }

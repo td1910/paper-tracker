@@ -1,47 +1,14 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import prisma from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL || "file:./dev.db" });
 
-router.use(authenticate);
-
-router.get('/', async (req: AuthRequest, res) => {
+// Public — list all topics in the catalog
+router.get('/', async (req, res) => {
   const topics = await prisma.topic.findMany({
-    where: { fkUserId: req.userId },
+    orderBy: { name: 'asc' },
   });
   res.json(topics);
-});
-
-router.post('/', async (req: AuthRequest, res) => {
-  const { name, keywords } = req.body;
-  const topic = await prisma.topic.create({
-    data: {
-      name,
-      keywords,
-      fkUserId: req.userId!,
-    },
-  });
-  res.status(201).json(topic);
-});
-
-router.put('/:id', async (req: AuthRequest, res) => {
-  const { id } = req.params;
-  const { name, keywords } = req.body;
-  const topic = await prisma.topic.updateMany({
-    where: { id: parseInt(id as string), fkUserId: req.userId },
-    data: { name, keywords },
-  });
-  res.json(topic);
-});
-
-router.delete('/:id', async (req: AuthRequest, res) => {
-  const { id } = req.params;
-  await prisma.topic.deleteMany({
-    where: { id: parseInt(id as string), fkUserId: req.userId },
-  });
-  res.status(204).send();
 });
 
 export default router;

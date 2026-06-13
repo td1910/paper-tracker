@@ -1,4 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+
+interface Topic {
+  id: number;
+  name: string;
+}
+
+interface PaperTopic {
+  fkTopicId: number;
+  topic: Topic;
+}
 
 interface Paper {
   id: number;
@@ -8,6 +18,7 @@ interface Paper {
   authors: string;
   publishedDate: string;
   url: string;
+  topics?: PaperTopic[];
 }
 
 export function PaperCard({ paper }: { paper: Paper }) {
@@ -21,7 +32,7 @@ export function PaperCard({ paper }: { paper: Paper }) {
   });
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
       <div className="flex justify-between items-start mb-2">
         <h3 className="text-xl font-bold text-blue-900 leading-tight">
           <a href={paper.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
@@ -37,7 +48,17 @@ export function PaperCard({ paper }: { paper: Paper }) {
         {paper.authors}
       </p>
 
-      <div className="text-gray-700 text-sm">
+      {paper.topics && paper.topics.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {paper.topics.map(pt => (
+            <span key={pt.fkTopicId} className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+              {pt.topic.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="text-gray-700 text-sm mt-auto">
         <p className={`${!isExpanded && 'line-clamp-3'}`}>
           {paper.abstract}
         </p>

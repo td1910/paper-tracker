@@ -3,7 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import topicRoutes from './routes/topics';
+import userTopicRoutes from './routes/user-topics';
 import paperRoutes from './routes/papers';
+import { startCronJobs } from './services/cron.service';
 
 dotenv.config();
 
@@ -15,6 +17,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/topics', topicRoutes);
+app.use('/api/user-topics', userTopicRoutes);
 app.use('/api/papers', paperRoutes);
 
 app.get('/', (req, res) => {
@@ -24,6 +27,9 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Initialize background jobs
+startCronJobs();
 
 app.listen(PORT as number, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);

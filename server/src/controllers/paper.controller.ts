@@ -13,8 +13,9 @@ export class PaperController {
 
   fetchNow = async (req: Request, res: Response) => {
     try {
-      await this.arxivService.fetchAndSavePapers();
-      res.json({ message: 'Fetch triggered successfully' });
+      // Fetch papers for ALL topics in the catalog
+      await this.arxivService.fetchAllTopics();
+      res.json({ message: 'Fetch triggered successfully for all topics' });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch papers' });
     }
