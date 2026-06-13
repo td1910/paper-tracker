@@ -27,6 +27,15 @@ router.get('/search', async (req: Request, res) => {
   res.json(papers);
 });
 
+// Get user's favorited paper IDs
+router.get('/my-favorites', authenticate, async (req: AuthRequest, res) => {
+  const favorites = await prisma.favorite.findMany({
+    where: { fkUserId: req.userId! },
+    select: { fkPaperId: true }
+  });
+  res.json(favorites.map(f => f.fkPaperId));
+});
+
 // Get paper details
 router.get('/:id', async (req: Request, res) => {
   const { id } = req.params;

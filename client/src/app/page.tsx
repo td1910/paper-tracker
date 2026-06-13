@@ -34,6 +34,8 @@ export default function Dashboard() {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
+  const [favoritedPaperIds, setFavoritedPaperIds] = useState<Set<number>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const router = useRouter();
@@ -59,12 +61,34 @@ export default function Dashboard() {
       setUserEmail(storedUserEmail);
     }
 
-    // Load papers and topics in parallel
-    Promise.all([
-      loadPapers(),
-      apiRequest('/topics').then(setTopics).catch(console.error),
-    ]);
-  }, [loadPapers]);
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const fetchedPapers = await apiRequest('/papers');
+        setPapers(fetchedPapers);
+
+        const allTopics = await apiRequest('/topics');
+        setTopics(allTopics);
+
+        if (token) {
+          const ut = await apiRequest('/user-topics', { headers: { Authorization: `Bearer ${token}` } });
+          const userFollowedTopicIds = ut.map((u: any) => u.fkTopicId);
+          if (userFollowedTopicIds.length > 0) {
+            setSelectedTopicIds(new Set(userFollowedTopicIds));
+          }
+
+          const favs = await apiRequest('/papers/my-favorites', { headers: { Authorization: `Bearer ${token}` } });
+          setFavoritedPaperIds(new Set(favs));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const handleManualFetch = async () => {
     try {
@@ -85,6 +109,8 @@ export default function Dashboard() {
     localStorage.removeItem('userEmail');
     setUserId(null);
     setUserEmail(null);
+    setFavoritedPaperIds(new Set());
+    setShowFavoritesOnly(false);
   };
 
   const toggleTopic = (topicId: number) => {
@@ -99,14 +125,37 @@ export default function Dashboard() {
     });
   };
 
-  const clearFilter = () => setSelectedTopicIds(new Set());
+  const clearFilter = () => {
+    setSelectedTopicIds(new Set());
+    setShowFavoritesOnly(false);
+  };
 
-  const filteredPapers =
-    selectedTopicIds.size === 0
-      ? papers
-      : papers.filter(p =>
-          p.topics?.some(pt => selectedTopicIds.has(pt.fkTopicId))
-        );
+  const handleToggleFavorite = async (paperId: number, newState: boolean) => {
+    try {
+      setFavoritedPaperIds(prev => {
+        const next = new Set(prev);
+        if (newState) next.add(paperId);
+        else next.delete(paperId);
+        return next;
+      });
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        await apiRequest(`/papers/${paperId}/favorite`, {
+          method: newState ? 'POST' : 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+    }
+  };
+
+  const filteredPapers = papers.filter(p => {
+    if (showFavoritesOnly && !favoritedPaperIds.has(p.id)) return false;
+    if (!showFavoritesOnly && selectedTopicIds.size > 0 && !p.topics?.some(pt => selectedTopicIds.has(pt.fkTopicId))) return false;
+    return true;
+  });
 
   const paperCountForTopic = (topicId: number) =>
     papers.filter(p => p.topics?.some(pt => pt.fkTopicId === topicId)).length;
@@ -175,13 +224,33 @@ export default function Dashboard() {
             <label className="flex items-center gap-2 py-1.5 cursor-pointer group">
               <input
                 type="checkbox"
-                checked={selectedTopicIds.size === 0}
+                checked={selectedTopicIds.size === 0 && !showFavoritesOnly}
                 onChange={clearFilter}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700 group-hover:text-gray-900">All</span>
               <span className="ml-auto text-xs text-gray-400">{papers.length}</span>
             </label>
+
+            {/* Favorites option */}
+            {userId && (
+              <label className="flex items-center gap-2 py-1.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={showFavoritesOnly}
+                  onChange={(e) => {
+                    setShowFavoritesOnly(e.target.checked);
+                    if (e.target.checked) setSelectedTopicIds(new Set());
+                  }}
+                  className="rounded border-gray-300 text-red-500 focus:ring-red-500"
+                />
+                <span className="text-sm font-medium text-red-600 group-hover:text-red-700 flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
+                  My Favorites
+                </span>
+                <span className="ml-auto text-xs text-gray-400">{favoritedPaperIds.size}</span>
+              </label>
+            )}
 
             <div className="border-t border-gray-100 mt-2 pt-2 space-y-0.5">
               {topics.map(topic => {
@@ -213,9 +282,11 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {selectedTopicIds.size === 0
-                  ? 'Latest Papers'
-                  : `${filteredPapers.length} paper${filteredPapers.length !== 1 ? 's' : ''} in ${selectedTopicIds.size} topic${selectedTopicIds.size !== 1 ? 's' : ''}`}
+                {showFavoritesOnly
+                  ? 'My Favorites'
+                  : selectedTopicIds.size === 0
+                    ? 'Latest Papers'
+                    : `${filteredPapers.length} paper${filteredPapers.length !== 1 ? 's' : ''} in ${selectedTopicIds.size} topic${selectedTopicIds.size !== 1 ? 's' : ''}`}
               </h2>
               {selectedTopicIds.size > 0 && (
                 <p className="text-sm text-gray-500 mt-0.5">
@@ -258,7 +329,12 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-4">
               {filteredPapers.map(paper => (
-                <PaperCard key={paper.id} paper={paper} />
+                <PaperCard 
+                  key={paper.id} 
+                  paper={paper} 
+                  isFavorited={favoritedPaperIds.has(paper.id)}
+                  onToggleFavorite={userId ? handleToggleFavorite : undefined}
+                />
               ))}
             </div>
           )}

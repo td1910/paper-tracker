@@ -22,7 +22,13 @@ interface Paper {
   topics?: PaperTopic[];
 }
 
-export function PaperCard({ paper }: { paper: Paper }) {
+interface PaperCardProps {
+  paper: Paper;
+  isFavorited?: boolean;
+  onToggleFavorite?: (paperId: number, newState: boolean) => void;
+}
+
+export function PaperCard({ paper, isFavorited = false, onToggleFavorite }: PaperCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Simple formatting for the date
@@ -33,8 +39,29 @@ export function PaperCard({ paper }: { paper: Paper }) {
   });
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col">
-      <div className="flex justify-between items-start mb-2">
+    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow flex flex-col relative group">
+      {onToggleFavorite && (
+        <button 
+          onClick={() => onToggleFavorite(paper.id, !isFavorited)}
+          className="absolute top-6 right-6 text-gray-400 hover:scale-110 transition-transform focus:outline-none"
+          title={isFavorited ? "Remove from favorites" : "Add to favorites"}
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill={isFavorited ? "currentColor" : "none"} 
+            stroke="currentColor" 
+            className={`w-6 h-6 ${isFavorited ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+        </button>
+      )}
+      
+      <div className="flex justify-between items-start mb-2 pr-10">
         <h3 className="text-xl font-bold text-blue-900 leading-tight">
           <a href={paper.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
             {paper.title}
