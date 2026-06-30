@@ -32,6 +32,7 @@ export class ArxivService {
       if (!Array.isArray(entries)) entries = [entries];
 
       let savedCount = 0;
+      const savedPaperIds: number[] = [];
 
       for (const rawEntry of entries) {
         try {
@@ -65,6 +66,7 @@ export class ArxivService {
             // Ignore unique constraint violation if it already exists
           }
 
+          savedPaperIds.push(paper.id);
           savedCount++;
         } catch (validationError) {
           console.warn(`Skipping invalid entry for topic "${topic.name}":`, validationError);
@@ -72,7 +74,7 @@ export class ArxivService {
       }
 
       console.log(`[${topic.name}] Saved ${savedCount} papers.`);
-      return savedCount;
+      return { savedCount, savedPaperIds };
     } catch (error) {
       console.error(`Error fetching papers for topic "${topic.name}":`, error);
       throw error;
@@ -84,10 +86,10 @@ export class ArxivService {
     const topics = await prisma.topic.findMany();
     for (const topic of topics) {
       try {
-        const count = await this.fetchAndSaveForTopic(topic, maxResults);
+        const { savedCount, savedPaperIds } = await this.fetchAndSaveForTopic(topic, maxResults);
         
         // Notify followers if new papers were found
-        if (count && count > 0) {
+        if (savedCount && savedCount > 0) {
           const followers = await prisma.userTopic.findMany({
             where: { fkTopicId: topic.id }
           });
@@ -95,7 +97,9 @@ export class ArxivService {
             await prisma.notification.createMany({
               data: followers.map(f => ({
                 fkUserId: f.fkUserId,
-                message: `We found ${count} new papers for ${topic.name}!`
+                fkTopicId: topic.id,
+                paperIds: JSON.stringify(savedPaperIds),
+                message: `We found ${savedCount} new papers for ${topic.name}!`
               }))
             });
             console.log(`[Notifications] Sent to ${followers.length} users for topic ${topic.name}`);

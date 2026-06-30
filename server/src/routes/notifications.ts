@@ -5,6 +5,17 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(authenticate);
 
+function parseNotificationPaperIds(paperIds: unknown) {
+  if (Array.isArray(paperIds)) return paperIds;
+  if (typeof paperIds !== 'string' || paperIds.trim() === '') return null;
+
+  try {
+    return JSON.parse(paperIds);
+  } catch {
+    return null;
+  }
+}
+
 // Get unread notifications
 router.get('/', async (req: AuthRequest, res) => {
   const notifications = await prisma.notification.findMany({
@@ -14,7 +25,10 @@ router.get('/', async (req: AuthRequest, res) => {
     },
     orderBy: { createdAt: 'desc' }
   });
-  res.json(notifications);
+  res.json(notifications.map(notification => ({
+    ...notification,
+    paperIds: parseNotificationPaperIds(notification.paperIds),
+  })));
 });
 
 // Mark all as read
@@ -27,6 +41,22 @@ router.put('/mark-read', async (req: AuthRequest, res) => {
     data: { isRead: true }
   });
   res.status(204).send();
+});
+
+// Mark a single notification as read
+router.put('/:id/read', async (req: AuthRequest, res) => {
+  const notificationId = parseInt(String(req.params.id), 10);
+
+  await prisma.notification.updateMany({
+    where: {
+      id: notificationId,
+      fkUserId: req.userId!,
+      isRead: false,
+    },
+    data: { isRead: true },
+  });
+
+  return res.status(204).send();
 });
 
 export default router;

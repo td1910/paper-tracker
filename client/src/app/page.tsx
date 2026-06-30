@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiRequest } from '@/lib/api';
@@ -21,6 +21,9 @@ interface NotificationItem {
   id: number;
   message: string;
   createdAt: string;
+  isRead: boolean;
+  fkTopicId?: number | null;
+  paperIds?: number[] | null;
 }
 
 interface Paper {
@@ -35,12 +38,21 @@ interface Paper {
 }
 
 export default function Dashboard() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const userId = useSyncExternalStore(
+    () => () => {},
+    () => localStorage.getItem('userId'),
+    () => null
+  );
+  const userEmail = useSyncExternalStore(
+    () => () => {},
+    () => localStorage.getItem('userEmail'),
+    () => null
+  );
   const [papers, setPapers] = useState<Paper[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
   const [favoritedPaperIds, setFavoritedPaperIds] = useState<Set<number>>(new Set());
+  const [selectedNotificationPaperIds, setSelectedNotificationPaperIds] = useState<Set<number>>(new Set());
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -50,6 +62,34 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const router = useRouter();
+
+  const hasUnreadNotifications = notifications.some(notification => !notification.isRead);
+
+  const mergeNotifications = (currentNotifications: NotificationItem[], incomingNotifications: NotificationItem[]) => {
+    const byId = new Map<number, NotificationItem>();
+
+    currentNotifications.forEach(notification => {
+      byId.set(notification.id, notification);
+    });
+
+    incomingNotifications.forEach(notification => {
+      const existing = byId.get(notification.id);
+      byId.set(notification.id, existing ?? { ...notification, isRead: false });
+    });
+
+    return Array.from(byId.values()).sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    );
+  };
+
+  const loadUnreadNotifications = useCallback(async (token: string) => {
+    try {
+      const notifs = await apiRequest('/notifications', { headers: { Authorization: `Bearer ${token}` } });
+      return Array.isArray(notifs) ? notifs : [];
+    } catch {
+      return [];
+    }
+  }, []);
 
   const loadPapers = useCallback(async () => {
     try {
@@ -65,13 +105,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const storedUserId = localStorage.getItem('userId');
-    const storedUserEmail = localStorage.getItem('userEmail');
-    if (token) {
-      setUserId(storedUserId);
-      setUserEmail(storedUserEmail);
-    }
-
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
@@ -83,7 +116,7 @@ export default function Dashboard() {
 
         if (token) {
           const ut = await apiRequest('/user-topics', { headers: { Authorization: `Bearer ${token}` } });
-          const userFollowedTopicIds = ut.map((u: any) => u.fkTopicId);
+          const userFollowedTopicIds = ut.map((u: { fkTopicId: number }) => u.fkTopicId);
           if (userFollowedTopicIds.length > 0) {
             setSelectedTopicIds(new Set(userFollowedTopicIds));
           }
@@ -91,12 +124,11 @@ export default function Dashboard() {
           const favs = await apiRequest('/papers/my-favorites', { headers: { Authorization: `Bearer ${token}` } });
           setFavoritedPaperIds(new Set(favs));
 
-          try {
-            const notifs = await apiRequest('/notifications', { headers: { Authorization: `Bearer ${token}` } });
-            setNotifications(notifs);
-          } catch (e) {
-            console.error('Failed to load notifications', e);
-          }
+          const notifs = await loadUnreadNotifications(token);
+          setNotifications(mergeNotifications([], notifs.map(notification => ({
+            ...notification,
+            isRead: false,
+          }))));
         }
       } catch (err) {
         console.error(err);
@@ -106,7 +138,7 @@ export default function Dashboard() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [loadUnreadNotifications]);
 
   const handleManualFetch = async () => {
     try {
@@ -116,8 +148,11 @@ export default function Dashboard() {
       
       const token = localStorage.getItem('token');
       if (token) {
-        const notifs = await apiRequest('/notifications', { headers: { Authorization: `Bearer ${token}` } });
-        setNotifications(notifs);
+        const notifs = await loadUnreadNotifications(token);
+        setNotifications(current => mergeNotifications(current, (notifs as NotificationItem[]).map(notification => ({
+          ...notification,
+          isRead: false,
+        }))));
       }
     } catch (error) {
       console.error('Failed to fetch from ArXiv:', error);
@@ -128,7 +163,7 @@ export default function Dashboard() {
   };
 
   const handleMarkNotificationsRead = async () => {
-    if (notifications.length === 0) return;
+    if (!hasUnreadNotifications) return;
     try {
       const token = localStorage.getItem('token');
       if (token) {
@@ -136,11 +171,55 @@ export default function Dashboard() {
           method: 'PUT', 
           headers: { Authorization: `Bearer ${token}` } 
         });
-        setNotifications([]);
+        setNotifications(currentNotifications => currentNotifications.map(notification => ({
+          ...notification,
+          isRead: true,
+        })));
       }
     } catch (e) {
       console.error('Failed to mark read', e);
     }
+  };
+
+  const handleMarkNotificationRead = async (notificationId: number) => {
+    const notification = notifications.find(item => item.id === notificationId);
+    if (!notification || notification.isRead) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await apiRequest(`/notifications/${notificationId}/read`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        setNotifications(currentNotifications => currentNotifications.map(item => (
+          item.id === notificationId
+            ? { ...item, isRead: true }
+            : item
+        )));
+      }
+    } catch (e) {
+      console.error('Failed to mark notification read', e);
+    }
+  };
+
+  const handleNotificationClick = async (notification: NotificationItem) => {
+    if (notification.paperIds && notification.paperIds.length > 0) {
+      setSelectedNotificationPaperIds(new Set(notification.paperIds));
+      setSelectedTopicIds(new Set());
+      setShowFavoritesOnly(false);
+      setSearchQuery('');
+      setSubmittedQuery('');
+    } else if (notification.fkTopicId) {
+      setSelectedTopicIds(new Set([notification.fkTopicId]));
+      setSelectedNotificationPaperIds(new Set());
+      setShowFavoritesOnly(false);
+      setSearchQuery('');
+      setSubmittedQuery('');
+    }
+
+    await handleMarkNotificationRead(notification.id);
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -166,8 +245,6 @@ export default function Dashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
     localStorage.removeItem('userEmail');
-    setUserId(null);
-    setUserEmail(null);
     setFavoritedPaperIds(new Set());
     setShowFavoritesOnly(false);
   };
@@ -211,6 +288,7 @@ export default function Dashboard() {
   };
 
   const filteredPapers = papers.filter(p => {
+    if (selectedNotificationPaperIds.size > 0) return selectedNotificationPaperIds.has(p.id);
     if (showFavoritesOnly && !favoritedPaperIds.has(p.id)) return false;
     if (!showFavoritesOnly && selectedTopicIds.size > 0 && !p.topics?.some(pt => selectedTopicIds.has(pt.fkTopicId))) return false;
     return true;
@@ -218,6 +296,8 @@ export default function Dashboard() {
 
   const paperCountForTopic = (topicId: number) =>
     papers.filter(p => p.topics?.some(pt => pt.fkTopicId === topicId)).length;
+
+  const activeNotificationCount = selectedNotificationPaperIds.size;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -267,14 +347,16 @@ export default function Dashboard() {
                     onClick={() => {
                       const newShow = !showNotifications;
                       setShowNotifications(newShow);
-                      if (newShow) handleMarkNotificationsRead();
                     }}
+                    aria-label="Notifications"
+                    aria-expanded={showNotifications}
+                    aria-haspopup="menu"
                     className="relative text-gray-500 hover:text-blue-600 transition focus:outline-none flex items-center justify-center h-8 w-8 rounded-full bg-gray-100 hover:bg-blue-50"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                     </svg>
-                    {notifications.length > 0 && (
+                    {hasUnreadNotifications && (
                       <span className="absolute top-0 right-0 flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 ring-2 ring-white"></span>
@@ -283,16 +365,38 @@ export default function Dashboard() {
                   </button>
                   {showNotifications && (
                     <div className="absolute right-0 mt-2 w-80 bg-white shadow-xl rounded-lg border border-gray-100 py-2 z-50 transform origin-top-right transition-all">
-                      <h3 className="text-sm font-bold border-b border-gray-100 px-4 pb-2 mb-2 text-gray-800">Notifications</h3>
+                      <div className="flex items-center justify-between border-b border-gray-100 px-4 pb-2 mb-2">
+                        <h3 className="text-sm font-bold text-gray-800">Notifications</h3>
+                        <button
+                          onClick={handleMarkNotificationsRead}
+                          disabled={!hasUnreadNotifications}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-800 disabled:text-gray-300 disabled:cursor-not-allowed"
+                        >
+                          Mark as Read
+                        </button>
+                      </div>
                       <div className="max-h-64 overflow-y-auto px-2">
                         {notifications.length === 0 ? (
                           <p className="text-xs text-gray-500 text-center py-4">No new notifications</p>
                         ) : (
                           notifications.map(n => (
-                            <div key={n.id} className="text-sm p-3 hover:bg-blue-50 rounded-md transition cursor-default mb-1">
-                              <p className="text-gray-800 font-medium">{n.message}</p>
-                              <div className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                            </div>
+                            <button
+                              key={n.id}
+                              onClick={() => handleNotificationClick(n)}
+                              className={`w-full text-left text-sm p-3 rounded-md transition mb-1 ${
+                                n.isRead ? 'bg-gray-50 hover:bg-gray-100 opacity-70' : 'hover:bg-blue-50'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                {!n.isRead && (
+                                  <span className="mt-1 h-2 w-2 rounded-full bg-blue-600 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className={`font-medium ${n.isRead ? 'text-gray-500' : 'text-gray-800'}`}>{n.message}</p>
+                                  <div className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                </div>
+                              </div>
+                            </button>
                           ))
                         )}
                       </div>
@@ -412,7 +516,9 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {submittedQuery
+                {activeNotificationCount > 0
+                  ? `Showing ${activeNotificationCount} paper${activeNotificationCount !== 1 ? 's' : ''} from notification`
+                  : submittedQuery
                   ? `Found ${filteredPapers.length} result${filteredPapers.length !== 1 ? 's' : ''} for "${submittedQuery}"`
                   : showFavoritesOnly
                     ? 'My Favorites'
@@ -427,6 +533,9 @@ export default function Dashboard() {
                     .map(t => t.name)
                     .join(', ')}
                 </p>
+              )}
+              {activeNotificationCount > 0 && (
+                <p className="text-sm text-gray-500 mt-0.5">Filtered to papers in the clicked notification.</p>
               )}
             </div>
 
@@ -454,7 +563,7 @@ export default function Dashboard() {
               </p>
               {papers.length === 0 && (
                 <p className="text-sm text-gray-400">
-                  Click "Fetch New Papers" to pull the latest research from arXiv.
+                  Click &quot;Fetch New Papers&quot; to pull the latest research from arXiv.
                 </p>
               )}
             </div>

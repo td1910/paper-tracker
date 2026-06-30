@@ -95,27 +95,24 @@ describe('Papers API (Search & Filter)', () => {
       }));
     });
 
-    it('should filter papers by a specific topic ID', async () => {
-       const mockPapers = [
+    it('should include related topics when searching papers', async () => {
+      const mockPapers = [
         { id: 1, title: 'AI in Finance', abstract: '...' }
       ];
-      
+
       // @ts-ignore
       prisma.paper.findMany.mockResolvedValue(mockPapers);
 
-      // We expect a topicId query parameter for filtering
-      const response = await request(app).get('/api/papers/search?topicId=2');
-      
+      const response = await request(app).get('/api/papers/search?q=finance');
+
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockPapers);
       expect(prisma.paper.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({
+        include: {
           topics: {
-            some: {
-              fkTopicId: 2 // Assuming we filter via relation
-            }
+            include: { topic: true }
           }
-        })
+        }
       }));
     });
   });

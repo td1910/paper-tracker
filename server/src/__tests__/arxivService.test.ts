@@ -7,8 +7,20 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 jest.mock('@prisma/client', () => {
   const mPrismaClient = {
+    topic: {
+      findMany: jest.fn(),
+    },
+    userTopic: {
+      findMany: jest.fn(),
+    },
+    notification: {
+      createMany: jest.fn(),
+    },
     paper: {
       upsert: jest.fn(),
+    },
+    paperTopic: {
+      create: jest.fn(),
     },
   };
   return { PrismaClient: jest.fn(() => mPrismaClient) };
@@ -42,9 +54,28 @@ describe('ArXiv Fetcher Service', () => {
     
     mockedAxios.get.mockResolvedValueOnce({ data: mockXmlResponse });
     // @ts-ignore
-    prisma.paper.upsert.mockResolvedValueOnce({});
+    prisma.topic.findMany.mockResolvedValueOnce([
+      { id: 1, name: 'AI Agents', keywords: 'agents, llm' }
+    ]);
+    // @ts-ignore
+    prisma.userTopic.findMany.mockResolvedValueOnce([
+      { fkUserId: 'user-1' }
+    ]);
+    // @ts-ignore
+    prisma.paper.upsert.mockResolvedValueOnce({ id: 1 });
+    // @ts-ignore
+    prisma.paperTopic.create.mockResolvedValueOnce({});
+    // @ts-ignore
+    prisma.notification.createMany.mockResolvedValueOnce({ count: 1 });
+
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
+      callback();
+      return 0 as any;
+    });
 
     await arxivService.fetchAllTopics();
+
+    setTimeoutSpy.mockRestore();
 
     // Verify axios was called with the correct URL
     expect(mockedAxios.get).toHaveBeenCalledWith(expect.stringContaining('http://export.arxiv.org/api/query'));
@@ -58,6 +89,16 @@ describe('ArXiv Fetcher Service', () => {
         abstract: 'This is a test abstract.',
         authors: 'John Doe, Jane Smith',
       }),
+    }));
+    expect(prisma.notification.createMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: [
+        expect.objectContaining({
+          fkUserId: 'user-1',
+          fkTopicId: 1,
+          paperIds: '[1]',
+          message: 'We found 1 new papers for AI Agents!',
+        })
+      ]
     }));
   });
 });

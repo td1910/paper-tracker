@@ -26,6 +26,7 @@ model Topic {
   description String?
   papers      PaperTopic[]
   followers   UserTopic[]
+  notifications Notification[]
   createdAt   DateTime     @default(now())
 }
 
@@ -34,7 +35,10 @@ model Notification {
   message   String
   isRead    Boolean  @default(false)
   fkUserId  String
+  fkTopicId Int?
+  paperIds  String?
   user      User     @relation(fields: [fkUserId], references: [id], onDelete: Cascade)
+  topic     Topic?   @relation(fields: [fkTopicId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 }
 

@@ -19,6 +19,12 @@ const prisma = new PrismaClient() as jest.Mocked<PrismaClient>;
 // Mock Arxiv Service
 jest.mock('../services/arxiv.service');
 
+jest.mock('../services/ai.service', () => ({
+  AiService: jest.fn().mockImplementation(() => ({
+    processUnscoredPapers: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 const app = express();
 app.use(express.json());
 
@@ -60,7 +66,7 @@ describe('Papers API Feed', () => {
     it('should manually trigger the arXiv fetcher and return success', async () => {
       jest.spyOn(ArxivService.prototype, 'fetchAllTopics').mockResolvedValueOnce();
 
-      const response = await request(app).post('/api/papers/fetch-now');
+      const response = await request(app).get('/api/papers/fetch-now');
       
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ message: 'Fetch triggered successfully for all topics' });
